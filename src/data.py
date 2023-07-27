@@ -21,4 +21,3 @@ def filter_df(df: pd.DataFrame, data_dir = None):
     dfd = get_df('daos', data_dir)
     TESTING_DAO_IDS = set(dfd[dfd['name'].isin(TESTING_DAO_NAMES)].index)
     return df[df['dao'].isin(TESTING_DAO_IDS)]
-    
