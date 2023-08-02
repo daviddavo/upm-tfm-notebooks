@@ -1,0 +1,9 @@
+jupyterlab
+torch
+pandas
+git+https://github.com/pyg-team/pytorch_geometric
+matplotlib
+plotly
+ray[tune]
+hyperopt
+ipywidgets
