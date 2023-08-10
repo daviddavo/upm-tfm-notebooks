@@ -36,11 +36,6 @@ class Daostack(InMemoryDataset):
         u_t = torch.LongTensor(df['voter'].cat.codes)
         p_t = torch.LongTensor(df['proposal'].cat.codes)
 
-        edge_index = torch.stack([
-            torch.cat([u_t, p_t]),
-            torch.cat([p_t, u_t]),
-        ])
-
         data['voter', 'votes', 'proposal']['edge_index'] = torch.stack([u_t, p_t])
         data['proposal', 'voted', 'voter']['edge_index'] = torch.stack([p_t, u_t])
 

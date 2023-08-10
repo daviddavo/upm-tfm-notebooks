@@ -7,3 +7,4 @@ plotly
 ray[tune]
 hyperopt
 ipywidgets
+duckdb
