@@ -11,6 +11,10 @@ class Daostack(InMemoryDataset):
 
         self.data = torch.load(self.processed_paths[0])
 
+    def download(self):
+        import kaggle
+        kaggle.api.dataset_download_cli('daviddavo/dao-analyzer', path=self.raw_dir, unzip=True)
+
     def process(self):
         import pandas as pd
 
@@ -45,18 +49,11 @@ class Daostack(InMemoryDataset):
         torch.save(data, self.processed_paths[0])
 
     @property
-    def raw_dir(self) -> str:
-        return self.root / 'daostack'
-
-    @property
-    def processed_dir(self) -> str:
-        return self.raw_dir / 'processed'
-
-    @property
     def raw_file_names(self) -> str:
-        return ['votes.csv', 'daos.csv']
+        return ['daostack/votes.csv', 'daostack/daos.csv']
     
     @property
     def processed_file_names(self) -> str:
-        return f"daostack_votes_{self._min_vpu}_{'-'.join(self._allowed_daos)}.pt"
+        allowed_daos_str = '-'.join(self._allowed_daos) if self._allowed_daos else 'all'
+        return f"daostack_votes_{self._min_vpu}_{allowed_daos_str}.pt"
     

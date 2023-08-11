@@ -8,3 +8,4 @@ ray[tune]
 hyperopt
 ipywidgets
 duckdb
+kaggle
