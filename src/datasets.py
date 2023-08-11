@@ -56,4 +56,99 @@ class Daostack(InMemoryDataset):
     def processed_file_names(self) -> str:
         allowed_daos_str = '-'.join(self._allowed_daos) if self._allowed_daos else 'all'
         return f"daostack_votes_{self._min_vpu}_{allowed_daos_str}.pt"
+
+class DAOCensus(InMemoryDataset):
+    def __init__(self, root: str, name: str, platform: str=None):
+        self._name = name
+        self._platform = platform
+        
+        super().__init__(root)
+
+        self.data = torch.load(self.processed_paths[0])
+
+    def download(self):
+        import kaggle
+        kaggle.api.dataset_download_cli('oiudoiajd/daos-census', path=self.raw_dir, unzip=True)
+
+    def process(self):
+        import pandas as pd
+        import duckdb
+
+        db = duckdb.connect(database=':memory:', read_only=False)
+        db.execute("CREATE VIEW deployments AS SELECT * FROM parquet_scan('{}')".format(self.raw_paths[0]))
+        db.execute("CREATE VIEW votes AS SELECT * FROM parquet_scan('{}')".format(self.raw_paths[1]))
+        db.execute("CREATE VIEW proposals AS SELECT * FROM parquet_scan('{}')".format(self.raw_paths[2]))
+
+        cond = f"name='{self._name}'"
+        if self._platform:
+            cond += f" AND platform='{self._platform}'"
+
+        dfv = db.execute(f"""
+        SELECT platform, name, votes.*
+        FROM deployments
+        LEFT JOIN votes ON (deployments.id = votes.deployment_id)
+        WHERE {cond}
+        """).fetchdf().rename(columns=lambda x: x.replace('_id', ''))
+
+        dfp = db.execute(f"""
+        SELECT platform, name, proposals.*
+        FROM deployments
+        LEFT JOIN proposals ON (deployments.id = proposals.deployment_id)
+        WHERE {cond}
+        """).fetchdf().rename(columns=lambda x: x.replace('_id', ''))
+
+        data = HeteroData()
+        t = {}
+
+        # display(dfp)
+        
+        dfv['voter'] = dfv['voter'].str.lower()
+        dfp['author'] = dfp['author'].str.lower()
+
+        prop_dtype = pd.api.types.CategoricalDtype(categories=dfp['id'])
+        user_dtype = pd.api.types.CategoricalDtype(categories=set(dfv['voter']).union(dfp['author']))
+
+        # voter <-> proposal (dfv)
+        dfv['voter'] = dfv['voter'].astype(user_dtype)
+        dfv['proposal'] = dfv['proposal'].astype(prop_dtype)
+
+        data['user'].num_nodes = user_dtype.categories.size
+        data['user'].voters = dfv['voter'].cat.codes.unique()
+        data['proposal'].num_nodes = prop_dtype.categories.size
+        
+        t = torch.stack([
+            torch.LongTensor(dfv['voter'].cat.codes),
+            torch.LongTensor(dfv['proposal'].cat.codes)
+        ])
+
+        data['user', 'vote', 'proposal'].edge_index = t
+        data['proposal', 'vote', 'user'].edge_index = t[(1,0), :]
+
+        # author <-> proposal (dfp)
+        dfp['author'] = dfp['author'].astype(user_dtype)
+        dfp['id'] = dfp['id'].astype(prop_dtype)
+        t = torch.stack([
+            torch.LongTensor(dfp['author'].cat.codes),
+            torch.LongTensor(dfp['id'].cat.codes),
+        ])
+
+        data['user'].authors = dfp['author'].cat.codes.unique()
+        data['user', 'creates', 'proposal'].edge_index = t
+        data['proposal', 'creates', 'user'].edge_index = t[(1,0), :]
+
+        data.validate()
+        assert not data.is_directed()
+        assert not data.has_isolated_nodes()
+
+        db.close()
+        torch.save(data, self.processed_paths[0])
+
+    @property
+    def raw_file_names(self):
+        return ["deployments.parquet", "votes.parquet", "proposals.parquet"]
+
+    @property
+    def processed_file_names(self) -> str:
+        pfrm_str = f"_{self._platform}" if self._platform else ""
+        return f"daostack_votes_{self._name}{pfrm_str}.pt"
     
