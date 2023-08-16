@@ -1,4 +1,6 @@
 import torch
+
+import torch_geometric as PyG
 from torch_geometric.data import InMemoryDataset, HeteroData
 
 class Daostack(InMemoryDataset):
@@ -10,6 +12,8 @@ class Daostack(InMemoryDataset):
         super().__init__(root)
 
         self.data = torch.load(self.processed_paths[0])
+        from pathlib import Path
+        Path(self.processed_paths[0]).unlink()
 
     def download(self):
         import kaggle
@@ -45,6 +49,7 @@ class Daostack(InMemoryDataset):
 
         data.validate()
         assert not data.is_directed(), "The created graph should not be directed"
+        assert PyG.utils.structured_negative_sampling_feasible(data['voter', 'votes', 'proposal'].edge_index)
 
         torch.save(data, self.processed_paths[0])
 
