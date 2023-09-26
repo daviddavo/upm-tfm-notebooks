@@ -1,4 +1,6 @@
+import torch
 from torch_geometric.data import Data, HeteroData
+from sklearn.model_selection import StratifiedKFold
 
 def shift_edge_indices(g: HeteroData) -> HeteroData:
     g = g.clone()
@@ -66,3 +68,35 @@ def get_train_val_test(g: Data | HeteroData, train_ratio=0.75):
         t = t()
             
     return t(g)
+
+def k_fold(g: Data | HeteroData, folds, edge_type=None, **kwargs):
+    skf = StratifiedKFold(folds, shuffle=True, **kwargs)
+
+    folds = []
+
+    # Stratify by voter
+    if edge_type is None:
+        edge_type = g.edge_types[0]
+        rev_edge_type = g.edge_types[1]
+        
+    edge_index = g[edge_type].edge_index
+    for train_idx, val_idx in skf.split(torch.zeros(edge_index.size(1)), edge_index[0]):
+        gtrain = g.edge_subgraph({
+            edge_type:torch.tensor(train_idx),
+            rev_edge_type:torch.tensor(train_idx),
+        })
+        assert gtrain.is_undirected()
+        assert len(gtrain[edge_type].edge_index[0].unique()) == len(g[edge_type].edge_index[0].unique())
+        # The negative samples should be different each epoch
+        # gtrain[edge_type].negative_samples = structured_negative_sampling(gtrain[edge_type].edge_index, (aux[edge_type[0]].num_nodes, aux[edge_type[2]].num_nodes))[2]
+        gval = g.edge_subgraph({
+            edge_type:torch.tensor(val_idx),
+            rev_edge_type:torch.tensor(val_idx),
+        })
+        assert gval.is_undirected()
+        assert len(gval[edge_type].edge_index[0].unique()) == len(g[edge_type].edge_index[0].unique())
+        assert (gtrain[edge_type].edge_index[0].unique() == gval[edge_type].edge_index[0].unique()).all()
+
+        folds.append((gtrain, gval))
+
+    return folds

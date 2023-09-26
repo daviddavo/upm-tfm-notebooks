@@ -63,12 +63,14 @@ class Daostack(InMemoryDataset):
         return f"daostack_votes_{self._min_vpu}_{allowed_daos_str}.pt"
 
 class DAOCensus(InMemoryDataset):
-    def __init__(self, root: str, name: str, platform: str=None):
+    def __init__(self, root: str, name: str, platform: str=None, min_vpu=None):
         self._name = name
         self._platform = platform
+        self._min_vpu = min_vpu if min_vpu is not None else 0
         
         super().__init__(root)
 
+        assert self._min_vpu >= 0, 'min_vpu must be positive'
         self.data = torch.load(self.processed_paths[0])
 
     def download(self):
@@ -109,6 +111,11 @@ class DAOCensus(InMemoryDataset):
         
         dfv['voter'] = dfv['voter'].str.lower()
         dfp['author'] = dfp['author'].str.lower()
+
+        if self._min_vpu:
+            vpu = dfv.groupby('voter').size()
+            allowed_voters = vpu[vpu >= self._min_vpu].index
+            dfv = dfv[dfv['voter'].isin(allowed_voters)]
 
         prop_dtype = pd.api.types.CategoricalDtype(categories=dfp['id'])
         user_dtype = pd.api.types.CategoricalDtype(categories=set(dfv['voter']).union(dfp['author']))
@@ -155,5 +162,5 @@ class DAOCensus(InMemoryDataset):
     @property
     def processed_file_names(self) -> str:
         pfrm_str = f"_{self._platform}" if self._platform else ""
-        return f"daostack_votes_{self._name}{pfrm_str}.pt"
+        return f"daostack_votes_{self._name}{pfrm_str}_{self._min_vpu}.pt"
     
