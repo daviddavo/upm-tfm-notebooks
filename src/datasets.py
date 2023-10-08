@@ -45,7 +45,7 @@ class Daostack(InMemoryDataset):
         p_t = torch.LongTensor(df['proposal'].cat.codes)
 
         data['voter', 'votes', 'proposal']['edge_index'] = torch.stack([u_t, p_t])
-        data['proposal', 'voted', 'voter']['edge_index'] = torch.stack([p_t, u_t])
+        data['proposal', 'rev_votes', 'voter']['edge_index'] = torch.stack([p_t, u_t])
 
         data.validate()
         assert not data.is_directed(), "The created graph should not be directed"
@@ -134,7 +134,7 @@ class DAOCensus(InMemoryDataset):
         ])
 
         data['user', 'vote', 'proposal'].edge_index = t
-        data['proposal', 'vote', 'user'].edge_index = t[(1,0), :]
+        data['proposal', 'rev_vote', 'user'].edge_index = t[(1,0), :]
 
         # author <-> proposal (dfp)
         dfp['author'] = dfp['author'].astype(user_dtype)
@@ -146,7 +146,7 @@ class DAOCensus(InMemoryDataset):
 
         data['user'].authors = dfp['author'].cat.codes.unique()
         data['user', 'creates', 'proposal'].edge_index = t
-        data['proposal', 'creates', 'user'].edge_index = t[(1,0), :]
+        data['proposal', 'rev_creates', 'user'].edge_index = t[(1,0), :]
 
         data.validate()
         assert not data.is_directed()
