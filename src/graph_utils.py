@@ -69,34 +69,29 @@ def get_train_val_test(g: Data | HeteroData, train_ratio=0.75):
             
     return t(g)
 
-def k_fold(g: Data | HeteroData, folds, edge_type=None, **kwargs):
+def k_fold(g: Data | HeteroData, folds, edge_types=None, **kwargs):
     skf = StratifiedKFold(folds, shuffle=True, **kwargs)
 
     folds = []
 
     # Stratify by voter
-    if edge_type is None:
-        edge_type = g.edge_types[0]
-        rev_edge_type = g.edge_types[1]
-        
-    edge_index = g[edge_type].edge_index
-    for train_idx, val_idx in skf.split(torch.zeros(edge_index.size(1)), edge_index[0]):
-        gtrain = g.edge_subgraph({
-            edge_type:torch.tensor(train_idx),
-            rev_edge_type:torch.tensor(train_idx),
-        })
-        assert gtrain.is_undirected()
-        assert len(gtrain[edge_type].edge_index[0].unique()) == len(g[edge_type].edge_index[0].unique())
-        # The negative samples should be different each epoch
-        # gtrain[edge_type].negative_samples = structured_negative_sampling(gtrain[edge_type].edge_index, (aux[edge_type[0]].num_nodes, aux[edge_type[2]].num_nodes))[2]
-        gval = g.edge_subgraph({
-            edge_type:torch.tensor(val_idx),
-            rev_edge_type:torch.tensor(val_idx),
-        })
-        assert gval.is_undirected()
-        assert len(gval[edge_type].edge_index[0].unique()) == len(g[edge_type].edge_index[0].unique())
-        assert (gtrain[edge_type].edge_index[0].unique() == gval[edge_type].edge_index[0].unique()).all()
+    if edge_types is None:
+        edge_types = list(zip(g.edge_types[::2], g.edge_types[1::2]))
 
-        folds.append((gtrain, gval))
+    gtrain_dict = {}
+    gval_dict = {}
+    for edge_type, rev_edge_type in edge_types:    
+        edge_index = g[edge_type].edge_index
+        for train_idx, val_idx in skf.split(torch.zeros(edge_index.size(1)), edge_index[0]):
+            gtrain_dict[rev_edge_type] = gtrain_dict[edge_type] = torch.tensor(train_idx)
+            gval_dict[rev_edge_type] = gval_dict[edge_type] = torch.tensor(val_idx)
+
+    gtrain = g.edge_subgraph(gtrain_dict)
+    gval = g.edge_subgraph(gval_dict)
+
+    assert gtrain.is_undirected()
+    assert gval.is_undirected()
+
+    folds.append((gtrain, gval))
 
     return folds
