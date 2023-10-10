@@ -25,11 +25,14 @@ class BPRSampler(NeighborSampler):
     ):
         self.neg_sampling: NegativeSampling = kwargs.pop('neg_sampling', None)
         self.input_edges = input_edges
-        self.input_edges_rev = (input_edges[2], 'rev_'+input_edges[1], input_edges[0])
 
         kwargs['num_neighbors']={v:[0] for v in data.edge_types} | { self.input_edges_rev:[1] }
         
         super().__init__(data, **kwargs)
+
+    @property
+    def input_edges_rev(self):
+        return (self.input_edges[2], 'rev_'+self.input_edges[1], self.input_edges[0])
 
     def sample_from_nodes(
         self, 
@@ -44,8 +47,6 @@ class BPRSampler(NeighborSampler):
         assert input_type == self.input_edges[0]
 
         if self.neg_sampling is not None:
-            if not self.neg_sampling.is_triplet():
-                raise NotImplementedError('Only triplet is currently supported')
             if input_type is None:
                 raise NotImplementedError('Only heterogeneous graphs are currently supported')
             if self.disjoint:
@@ -64,22 +65,34 @@ class BPRSampler(NeighborSampler):
             )
 
             original = out.node[dst_name][out.col[self.input_edges]]
-
+    
             dst = torch.cat((original, dst_neg), dim=0)
             # Re-index the proposals taking into account the new ones
             dst, inv_dst = dst.unique(return_inverse=True)
 
-            dst_pos_index = inv_dst[:num_pos]
-            dst_neg_index = inv_dst[num_pos:]
-
-            # note: row = src; col = dst
-            out.col[self.input_edges] = out.row[self.input_edges_rev] = dst_pos_index
             out.node[dst_name] = dst
+            
+            if self.neg_sampling.is_triplet():
+                dst_pos_index = inv_dst[:num_pos]
+                dst_neg_index = inv_dst[num_pos:]
+    
+                # note: row = src; col = dst
+                out.col[self.input_edges] = out.row[self.input_edges_rev] = dst_pos_index
+    
+                if DO_ASSERTS:
+                    assert torch.equal(prev_node_[prev_col_], dst[dst_pos_index])
+                    
+                out.metadata = (*out.metadata, src_index, dst_pos_index, dst_neg_index)
+            else:
+                assert self.neg_sampling.is_binary(), "Neg sampling method should be triplet or binary"
+                edge_label_index = torch.stack([src_index.repeat(2),inv_dst])
+                edge_label = torch.cat((torch.full((num_pos,), True), torch.full((num_pos,), False)))
 
-            if DO_ASSERTS:
-                assert torch.equal(prev_node_[prev_col_], dst[dst_pos_index])
+                if DO_ASSERTS:
+                    assert torch.equal(prev_node_[prev_col_], out.node[dst_name][edge_label_index[1, edge_label]])
+
+                out.metadata = (*out.metadata, edge_label_index, edge_label)
                 
-            out.metadata = (*out.metadata, src_index, dst_pos_index, dst_neg_index)
         return out
 
 # True negative sampling is really expensive

@@ -31,11 +31,12 @@ class BPRLoader(NodeLoader):
         is_sorted: bool = False,
         filter_per_worker: Optional[bool] = None,
         bpr_sampler: Optional[BPRSampler] = None,
-        neg_sampling: Optional[NegativeSampling] = None,
+        neg_sampling: Optional[NegativeSampling] = 'triplet',
+        transform_global: bool = False,
         **kwargs,
     ):
-        if neg_sampling is None:
-            neg_sampling = NegativeSampling.cast('triplet')
+        if isinstance(neg_sampling, str):
+            neg_sampling = NegativeSampling.cast(neg_sampling)
         
         if bpr_sampler is None:
             bpr_sampler = BPRSampler(
@@ -62,11 +63,18 @@ class BPRLoader(NodeLoader):
             **kwargs,
         )
 
+        if transform_global:
+            self.transform = self.transform_global
+
     def filter_fn(
         self,
         out: Union[SamplerOutput, HeteroSamplerOutput],
     ) -> Union[Data, HeteroData]:
+        # Avoid calling transform on super().filter_fn()
+        _aux = self.transform
+        self.transform = None
         data = super().filter_fn(out)
+        self.transform = _aux
 
         # TODO: make data[input_type].out_dst when there are negative samples like in LinkLoader
         # raise NotImplementedError()
@@ -79,7 +87,7 @@ class BPRLoader(NodeLoader):
         # copied from torch_geometric.loader.LinkLoader
         if self.node_sampler.neg_sampling.is_triplet():
             if input_type == input_edges[0]:
-                data[input_edges[2]].src_index = out.metadata[2]
+                data[input_edges[-1]].src_index = out.metadata[2]
                 data[input_edges[0]].dst_pos_index = out.metadata[3]
                 data[input_edges[0]].dst_neg_index = out.metadata[4]
 
@@ -87,7 +95,35 @@ class BPRLoader(NodeLoader):
                     if t != input_edges and t != self.node_sampler.input_edges_rev:
                         assert data[t].edge_index.numel() == 0
                         del data[t] # it shouldn't have any meaningful info
+        elif self.node_sampler.neg_sampling.is_binary():
+            if input_type == input_edges[0]:
+                data[input_edges].edge_label_index = out.metadata[2]
+                # The mask where 0 = neg and 1 = pos
+                data[input_edges].edge_label = out.metadata[3]
         else:
-            raise NotImplementedError('Only triplet is currently supported')
+            raise NotImplementedError('Only triplet and binary is currently supported')
+        
+        return data if not self.transform else self.transform(data)
+
+    def transform_global(self, data: HeteroData) -> HeteroData:
+        print(data)
+        for e, es in data.edge_items():
+            es.edge_index[0] = data[e[0]].n_id[es.edge_index[0]]
+            es.edge_index[1] = data[e[-1]].n_id[es.edge_index[1]]
+
+            if hasattr(es, 'edge_label_index'):
+                es.edge_label_index[0] = data[e[0]].n_id[es.edge_label_index[0]]
+                es.edge_label_index[1] = data[e[-1]].n_id[es.edge_label_index[1]]
+    
+        input_edges = self.node_sampler.input_edges
+
+        if hasattr(data[input_edges[0]], 'dst_pos_index'):
+            data[input_edges[0]].dst_pos_index = data[input_edges[-1]].n_id[data[input_edges[0]].dst_pos_index]
+            data[input_edges[0]].dst_neg_index = data[input_edges[-1]].n_id[data[input_edges[0]].dst_neg_index]
+            data[input_edges[-1]].src_index = data[input_edges[0]].n_id[data[input_edges[-1]].src_index]
+        
+        for n, ns in data.node_items():
+            ns.num_nodes = self.data[n].num_nodes
+            del ns.n_id
         
         return data
