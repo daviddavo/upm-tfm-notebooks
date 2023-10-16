@@ -9,3 +9,6 @@ hyperopt
 ipywidgets
 duckdb
 kaggle
+recommenders
+tensorflow
+
