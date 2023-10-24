@@ -13,6 +13,7 @@ def load_pandas_df(
     filter_name: str = None, 
     filter_platform: str = None, 
     min_vpu: int = 0,
+    min_vpp: int = 1,
 ):
     import pandas as pd
     import duckdb
@@ -22,22 +23,26 @@ def load_pandas_df(
     db.execute("CREATE VIEW votes AS SELECT * FROM parquet_scan('{}')".format(raw_path / "votes.parquet"))
     db.execute("CREATE VIEW proposals AS SELECT * FROM parquet_scan('{}')".format(raw_path / "proposals.parquet"))
 
-    cond = f"name='{filter_name}'"
+    cond_dfv = f"name='{filter_name}'"
     if filter_platform:
-        cond += f" AND platform='{filter_platform}'"
+        cond_dfv += f" AND platform='{filter_platform}'"
+
+    cond_dfp = cond_dfv
+    if min_vpp:
+        cond_dfp += f" AND proposals.votes_count > {min_vpp}"
 
     dfv = db.execute(f"""
     SELECT platform, name, votes.*
     FROM deployments
     LEFT JOIN votes ON (deployments.id = votes.deployment_id)
-    WHERE {cond}
+    WHERE {cond_dfv}
     """).fetchdf().rename(columns=lambda x: x.replace('_id', ''))
 
     dfp = db.execute(f"""
-    SELECT platform, name, proposals.*
+    SELECT platform, name, platform_deployment_id, proposals.*
     FROM deployments
     LEFT JOIN proposals ON (deployments.id = proposals.deployment_id)
-    WHERE {cond}
+    WHERE {cond_dfp}
     """).fetchdf().rename(columns=lambda x: x.replace('_id', ''))
 
     dfv['voter'] = dfv['voter'].str.lower()
