@@ -29,7 +29,7 @@ def load_pandas_df(
 
     cond_dfp = cond_dfv
     if min_vpp:
-        cond_dfp += f" AND proposals.votes_count > {min_vpp}"
+        cond_dfp += f" AND proposals.votes_count >= {min_vpp}"
 
     dfv = db.execute(f"""
     SELECT platform, name, votes.*
@@ -51,7 +51,7 @@ def load_pandas_df(
     if min_vpu:
         vpu = dfv.groupby('voter').size()
         allowed_voters = vpu[vpu >= min_vpu].index
-        dfv = dfv[dfv['voter'].isin(allowed_voters)]
+        dfv = dfv[dfv['voter'].isin(allowed_voters)].reset_index(drop=True)
 
     prop_dtype = pd.api.types.CategoricalDtype(categories=dfp['id'])
     user_dtype = pd.api.types.CategoricalDtype(categories=set(dfv['voter']).union(dfp['author']))
