@@ -11,4 +11,5 @@ duckdb
 kaggle
 recommenders
 tensorflow
+sentence-transformers
 
