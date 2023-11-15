@@ -20,11 +20,20 @@ def timeIntervalSplit(df: pd.DataFrame, splits: int, timestamp_col: str = 'times
         acc_time = end_time
         yield train, test
 
-def filter_current(df, dfp, t):
-    current_proposals = dfp[(dfp['start'] < t) & (t < dfp['end']) ]
-    return df[df['itemID'].isin(current_proposals['id'])]
+def current_proposals(dfp, t):
+    return dfp[(dfp['start'] < t) & (t < dfp['end']) ]['id']
 
-def timeIntervalSplitCurrent(dfv: pd.DataFrame, splits: int, dfp: pd.DataFrame, **kwargs):
+def filter_current(df, dfp, t):
+    return df[df['itemID'].isin(current_proposals(dfp, t))]
+
+def timeIntervalSplitCurrent(dfv: pd.DataFrame, splits: int, dfp: pd.DataFrame, return_open: bool = False, **kwargs):
     for train, test in timeIntervalSplit(dfv, splits, **kwargs):
         t = train.timestamp.max()
-        yield train, filter_current(test, dfp, t)
+        open_proposals = current_proposals(dfp, t)
+
+        test_filtered = test[test['itemID'].isin(open_proposals)]
+
+        if return_open:
+            yield train, test_filtered, t, open_proposals
+        else:
+            yield train, test_filtered
