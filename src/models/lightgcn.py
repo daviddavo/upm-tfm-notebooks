@@ -1,3 +1,7 @@
+import numpy as np
+import pandas as pd
+
+from recommenders.utils.python_utils import get_top_k_scored_items
 from recommenders.models.deeprec.models.graphrec.lightgcn import LightGCN
 
 class LightGCNCustom(LightGCN):
