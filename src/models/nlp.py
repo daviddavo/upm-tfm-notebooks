@@ -71,7 +71,7 @@ class NLPSimilarity(NLPModel):
         np_voter_embeddings = np.stack(voter_embeddings.to_numpy())
     
         prop_embeddings = self.embeddings
-        if recommend_from:
+        if recommend_from is not None:
             assert len(recommend_from) >= top_k, "top_k should be greater than the number of proposals to recommend"
             prop_embeddings = self.embeddings.loc[recommend_from]
 

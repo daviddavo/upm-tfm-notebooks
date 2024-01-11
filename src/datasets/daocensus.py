@@ -18,6 +18,7 @@ def load_pandas_df(
     import pandas as pd
     import duckdb
 
+    raw_path = Path(raw_path)
     db = duckdb.connect(database=':memory:', read_only=False)
     db.execute("CREATE VIEW deployments AS SELECT * FROM parquet_scan('{}')".format(raw_path / "deployments.parquet"))
     db.execute("CREATE VIEW votes AS SELECT * FROM parquet_scan('{}')".format(raw_path / "votes.parquet"))
@@ -97,7 +98,7 @@ class DAOCensus(InMemoryDataset):
     def process(self):
         import pandas as pd
 
-        dfv, dfp = load_pandas_df(self._name, self._platform, self._min_vpu)
+        dfv, dfp = load_pandas_df(self.raw_dir, self._name, self._platform, self._min_vpu)
 
         data = HeteroData()
         t = {}
