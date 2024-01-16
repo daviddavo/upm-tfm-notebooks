@@ -1,3 +1,6 @@
+# IDEs
+.vscode
+
 # Local Environment files
 .env.local
 
