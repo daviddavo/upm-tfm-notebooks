@@ -26,7 +26,11 @@ def timeIntervalSplit(df: pd.DataFrame, splits: int, timestamp_col: str = 'times
         yield train, test
 
 def current_proposals(dfp, t):
-    return dfp[(dfp['start'] < t) & (t < dfp['end']) ]['id']
+    props = dfp[(dfp['start'] < t) & (t < dfp['end']) ]
+    if 'id' in props.columns:
+        return props['id']
+    else:
+        return props.index
 
 def filter_current(df, dfp, t):
     return df[df['itemID'].isin(current_proposals(dfp, t))]
@@ -43,8 +47,8 @@ def timeIntervalSplitCurrent(dfv: pd.DataFrame, splits: int, dfp: pd.DataFrame, 
         else:
             yield train, test_filtered
 
-def timeFreqSplitCurrent(dfv: pd.DataFrame, freq: str, dfp: pd.DataFrame, return_open: bool = False, remove_not_in_train_col = None):
-    times = pd.date_range(dfv['timestamp'].min(), dfv['timestamp'].max(), freq=freq)
+def timeFreqSplitCurrent(dfv: pd.DataFrame, freq: str, dfp: pd.DataFrame, return_open: bool = False, remove_not_in_train_col = None, normalize = True):
+    times = pd.date_range(dfv['timestamp'].min(), dfv['timestamp'].max(), freq=freq, normalize=normalize)
     for train_end, test_end in zip(times, times[1:]):
         train, test = _getTrainTestFromTime(train_end, test_end, dfv, 'timestamp', remove_not_in_train_col=remove_not_in_train_col)
         

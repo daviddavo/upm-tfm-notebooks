@@ -12,4 +12,6 @@ kaggle
 recommenders
 tensorflow
 sentence-transformers
-
+joblib
+solara
+kaleido

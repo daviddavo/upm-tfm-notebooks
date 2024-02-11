@@ -3,6 +3,7 @@ from pathlib import Path
 import pandas as pd
 
 from . import daocensus
+from .. import utils
 
 def download(path):
     import kaggle
@@ -11,7 +12,7 @@ def download(path):
     (path / 'proposals.parquet').rename(path / 'proposals-original.parquet')
     (path / 'proposals-text.parquet').rename(path / 'proposals.parquet')
 
-def load_pandas_df(raw_path: str, *args, remove_new_proposals=True, **kwargs):
+def load_pandas_df(raw_path: str, *args, remove_new_proposals=True, remove_ghost_votes=True, remove_unused_categories=True, **kwargs):
     dfv, dfp = daocensus.load_pandas_df(raw_path, *args, **kwargs)
     
     if remove_new_proposals:
@@ -19,6 +20,17 @@ def load_pandas_df(raw_path: str, *args, remove_new_proposals=True, **kwargs):
         dfp_original = pd.read_parquet(raw_path/'proposals-original.parquet')
 
         dfp = dfp[dfp['id'].isin(dfp_original['id'])].copy()
+
+    if remove_ghost_votes:
+        msk = dfv['proposal'].isin(dfp['id'])
+        if msk.any():
+            print(f"Warning, removing {msk.sum()} votes without proposal")
+        
+        dfv = dfv[msk]
+
+    if remove_unused_categories:
+        dfv = utils.remove_unused_categories(dfv)
+        dfp = utils.remove_unused_categories(dfp)
 
     return dfv, dfp
 

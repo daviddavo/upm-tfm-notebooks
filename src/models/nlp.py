@@ -1,3 +1,5 @@
+from typing import Optional, Union
+
 from pathlib import Path
 
 import pandas as pd
@@ -5,46 +7,53 @@ import numpy as np
 
 from sentence_transformers import SentenceTransformer
 
+from .. import paths
+
+def get_embeddings_from_cache(dfp, model, embeddings_cache=None):
+    if embeddings_cache == None:
+        embeddings_cache = paths.pln_embeddings_cache(model)
+
+    if embeddings_cache.exists():
+        prev_embeddings = pd.read_pickle(embeddings_cache)
+        remaining_embeddings_idx = dfp.index.difference(prev_embeddings.index)
+    else:
+        prev_embeddings = pd.Series(dtype=str)
+        remaining_embeddings_idx = dfp.index
+
+    if not remaining_embeddings_idx.empty:
+        print("Some embeddings need to be calculated")
+        remaining = dfp.loc[remaining_embeddings_idx]
+        title_description = remaining['title'] + '\n' + remaining['description']
+
+        new_embeddings = pd.Series(
+            list(model.encode(title_description, show_progress_bar=True, normalize_embeddings=True)),
+            index=title_description.index,
+        )
+
+        all_embeddings = pd.concat((prev_embeddings, new_embeddings))
+        all_embeddings.to_pickle(embeddings_cache)
+    else:
+        print("All embeddings are already calculated")
+        all_embeddings = prev_embeddings
+    
+    return all_embeddings.loc[dfp.index]
+
 class NLPModel:
     def __init__(self, 
         dfp: pd.DataFrame,
         *,
         transformer_model: str ='all-mpnet-base-v2',
         show_progress_bar: bool = True,
-        embeddings_cache: str = './data/embeddings/proposals.pkl',
+        embeddings_cache: Optional[Union[str, Path]] = None,
     ):
         self.dfp = dfp
         self.transformer_model = SentenceTransformer(transformer_model)
         self.show_progress_bar = show_progress_bar
-        self.embeddings_cache: Path = Path(embeddings_cache)
+        self.embeddings_cache: Path = embeddings_cache or paths.pln_embeddings_cache()
         self.embeddings = None
 
     def fit(self):
-        if self.embeddings_cache.exists():
-            prev_embeddings = pd.read_pickle(self.embeddings_cache)
-            remaining_embeddings_idx = self.dfp.index.difference(prev_embeddings.index)
-        else:
-            self.embeddings_cache.parent.mkdir(parents=True, exist_ok=True)
-            prev_embeddings = pd.Series(dtype=str)
-            remaining_embeddings_idx = self.dfp.index
-        
-        if not remaining_embeddings_idx.empty:
-            print("Some embeddings need to be calculated")
-            remaining = self.dfp.loc[remaining_embeddings_idx]
-            title_description = remaining['title'] + '\n' + remaining['description']
-
-            new_embeddings = pd.Series(
-                list(self.transformer_model.encode(title_description, show_progress_bar=self.show_progress_bar, normalize_embeddings=True)),
-                index=title_description.index,
-            )
-
-            all_embeddings = pd.concat((prev_embeddings, new_embeddings))
-            all_embeddings.to_pickle(self.embeddings_cache)
-        else:
-            print("All embeddings are already calculated")
-            all_embeddings = prev_embeddings
-
-        self.embeddings = all_embeddings.loc[self.dfp.index]
+        self.embeddings = get_embeddings_from_cache(self.dfp, self.transformer_model, self.embeddings_cache)
 
 class NLPSimilarity(NLPModel):
     def __init__(self,
