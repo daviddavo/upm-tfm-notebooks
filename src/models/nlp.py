@@ -49,7 +49,7 @@ class NLPModel:
         self.dfp = dfp
         self.transformer_model = SentenceTransformer(transformer_model)
         self.show_progress_bar = show_progress_bar
-        self.embeddings_cache: Path = embeddings_cache or paths.pln_embeddings_cache()
+        self.embeddings_cache: Path = embeddings_cache or paths.pln_embeddings_cache(transformer_model)
         self.embeddings = None
 
     def fit(self):
@@ -81,7 +81,7 @@ class NLPSimilarity(NLPModel):
     
         prop_embeddings = self.embeddings
         if recommend_from is not None:
-            assert len(recommend_from) >= top_k, "top_k should be greater than the number of proposals to recommend"
+            assert len(recommend_from) >= top_k, "top_k should not be greater than the number of proposals to recommend"
             prop_embeddings = self.embeddings.loc[recommend_from]
 
         tr_embeddings = np.stack(prop_embeddings.to_numpy())

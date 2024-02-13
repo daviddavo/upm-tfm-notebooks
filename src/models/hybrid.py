@@ -40,7 +40,8 @@ def merge_apply_naive(group, top_k=5):
 
 def merge_apply_avg(group, top_k=5):
     """
-    Averages the ranking of the two predictors
+    Averages the ranking of the two predictors in the common recommendations
+    The other ones remain with their score
     """
     group['hyb_score'] = group.groupby('rec').cumcount()
 
@@ -58,13 +59,39 @@ def merge_apply_avg(group, top_k=5):
 
     return both.head(top_k)[['prediction', 'rec']]
 
+def merge_apply_avg_all(group, top_k=5):
+    """
+    Averages the ranking of the two predictors
+    This considers that a recommendation that is not common has a ranking
+    i+k
+    """
+    group['hyb_score'] = group.groupby('rec').cumcount()
+
+    common = pd.DataFrame(index=group[group['itemID'].duplicated(keep='first')]['itemID'], columns=['hyb_score', 'prediction', 'rec'])
+    if not common.empty:
+        common['hyb_score'] = group.groupby('itemID')['hyb_score'].mean()
+        common['prediction'] = common['hyb_score']
+        common['rec'] = 'both'
+    
+    notcommon = group.drop_duplicates('itemID', keep=False).set_index('itemID')
+    notcommon['hyb_score'] += top_k/2
+
+    # Always ascending (i.e: the first element will have a score of 0)
+    both = pd.concat((common, notcommon)).sort_values('hyb_score')
+    both['prediction'] = both['hyb_score']
+
+    return both.head(top_k)[['prediction', 'rec']]
+
 __STR_2_F_DICT = {
     'avg': merge_apply_avg,
+    'avg_all': merge_apply_avg_all,
     'naive': merge_apply_naive,
     'prioritize': merge_apply_prioritize_common,
 }
 def strToFunc(string: str):
     return __STR_2_F_DICT[string]
+
+MERGE_FUNCTIONS = list(__STR_2_F_DICT.keys())
 
 class HybridRecommendation:
     def __init__(self, train, test, dfp, *, seed=None, merge_func: Union[Callable, str] = None, lightgcn_config=dict(), nlp_config=dict()):
@@ -75,12 +102,7 @@ class HybridRecommendation:
         self.lightgcn = self._prepare_lightgcn(**lightgcn_config)
         self.nlp = self._prepare_nlp(**nlp_config)
 
-        if merge_func is None:
-            self._merge_apply = merge_apply_avg
-        elif isinstance(merge_func, str):
-            self._merge_apply = strToFunc(merge_func)
-        else:
-            self._merge_apply = merge_func
+        self.set_merge_func(merge_func)
 
     def _prepare_lightgcn(self, cf_seed=None, **kwargs):
         hparams = prepare_hparams(
@@ -92,6 +114,14 @@ class HybridRecommendation:
 
     def _prepare_nlp(self, **kwargs):
         return NLPSimilarity(self.train, self.dfp, **kwargs)
+
+    def set_merge_func(self, merge_func: Union[Callable, str]):
+        if merge_func is None:
+            self._merge_apply = merge_apply_avg
+        elif isinstance(merge_func, str):
+            self._merge_apply = strToFunc(merge_func)
+        else:
+            self._merge_apply = merge_func
 
     def fit_epoch(self):
         self.lightgcn.fit_epoch()
@@ -112,9 +142,9 @@ class HybridRecommendation:
         return all_recs.groupby('userID').apply(self._merge_apply, top_k=top_k, **kwargs).reset_index()
     
     def recommend_k_items(
-        self, to_users, top_k=5, sort_top_k=True, remove_seen=True, use_id=False, recommend_from=None, **kwargs,
+        self, to_users, top_k=5, sort_top_k=True, remove_seen=True, use_id=False, recommend_from=None, nlp_min_score=-np.inf, **kwargs,
     ):
-        self.nlp_recs = self.nlp.recommend_k_items(to_users, top_k=top_k, remove_seen=remove_seen, recommend_from=recommend_from)
+        self.nlp_recs = self.nlp.recommend_k_items(to_users, top_k=top_k, remove_seen=remove_seen, recommend_from=recommend_from, min_score=nlp_min_score)
 
         gnn_users = pd.DataFrame({'userID': to_users})
         self.gnn_recs = self.lightgcn.recommend_k_items(gnn_users, sort_top_k=True, top_k=top_k, remove_seen=remove_seen, recommend_from=recommend_from)

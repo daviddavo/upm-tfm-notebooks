@@ -31,9 +31,9 @@ def hybrid_recs(org_name: str, splits_freq: str, normalize: bool, base: Path=HYB
     base.mkdir(exist_ok=True)
     return base / _gen_fname('recommendations', org_name, splits_freq, normalize)
 
-def hybrid_results(org_name: str, splits_freq: str, normalize: bool, merge_func: str, base: Path=HYBRID_BASE_PATH) -> Path:
+def hybrid_results(org_name: str, splits_freq: str, normalize: bool, base: Path=HYBRID_BASE_PATH) -> Path:
     base.mkdir(exist_ok=True)
-    return base / _gen_fname(f'results-{merge_func}', org_name, splits_freq, normalize)
+    return base / _gen_fname('results', org_name, splits_freq, normalize)
 
 def hybrid_debug(org_name: str, splits_freq: str, normalize: bool, merge_func: str, base: Path=HYBRID_BASE_PATH) -> Path:
     base.mkdir(exist_ok=True)

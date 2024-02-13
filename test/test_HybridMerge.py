@@ -75,3 +75,30 @@ def test_merge_apply_avg():
     assert res['rec'].tolist() == ['A', 'A', 'B', 'both']
     assert res.index.tolist() == ["a", "b", "e", "d"]
 
+def test_merge_apply_avg_all():
+    df = pd.DataFrame({
+        'itemID': ['a', 'b', 'c', 'd', 'd', 'e', 'f', 'g'],
+        'rec':    ['A', 'A', 'A', 'A', 'B', 'B', 'B', 'B'],
+        'prediction': pd.NA,
+    })
+    
+    res = H.merge_apply_avg_all(df, top_k=4)
+
+    assert res['rec'].tolist() == ['both', 'A', 'A', 'B']
+    assert res.index.tolist() == ["d", "a", "b", "e"]
+
+def test_merge_apply_avg_all2():
+    df = pd.DataFrame({
+        'itemID': [
+            'A', 'B', 'C', 'D', 'E', 'F',
+            'B', 'E', 'H', 'I', 'J', 'F',
+        ],
+        'rec':    ['A']*6 + ['B']*6,
+        'prediction': pd.NA,
+    })
+    
+    res = H.merge_apply_avg_all(df, top_k=6)
+
+    assert res.index.tolist() == ["B", "E", "A", "F", "C", "H"]
+    assert res['rec'].tolist() == ['both', 'both', 'A', 'both', 'A', 'B']
+
