@@ -8,6 +8,7 @@ ray[tune]
 hyperopt
 ipywidgets
 duckdb
+duckdb-engine
 kaggle
 recommenders
 tensorflow
@@ -15,3 +16,4 @@ sentence-transformers
 joblib
 solara
 kaleido
+jupysql
