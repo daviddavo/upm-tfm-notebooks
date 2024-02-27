@@ -4,7 +4,7 @@ import pandas as pd
 
 def _getTrainTestFromTime(train_end_t, test_end_t, df, timestamp_col, remove_not_in_train_col: Optional[str] = None):
     train = df[df[timestamp_col] <= train_end_t]
-    test = df[ (train_end_t < df[timestamp_col]) & (df[timestamp_col] < test_end_t) ]
+    test = df[ (train_end_t < df[timestamp_col]) & (df[timestamp_col] <= test_end_t) ]
 
     if remove_not_in_train_col is not None:
         msk = test[remove_not_in_train_col].isin(set(train[remove_not_in_train_col]))
@@ -26,7 +26,7 @@ def timeIntervalSplit(df: pd.DataFrame, splits: int, timestamp_col: str = 'times
         yield train, test
 
 def current_proposals(dfp, t):
-    props = dfp[(dfp['start'] < t) & (t < dfp['end']) ]
+    props = dfp[(dfp['start'] < t) & (t <= dfp['end']) ]
     if 'id' in props.columns:
         return props['id']
     else:
