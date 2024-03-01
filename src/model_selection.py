@@ -26,6 +26,9 @@ def timeIntervalSplit(df: pd.DataFrame, splits: int, timestamp_col: str = 'times
         yield train, test
 
 def current_proposals(dfp, t):
+    """
+    Open proposals: The ones that started before _t_, but are still open (close after _t_)
+    """
     props = dfp[(dfp['start'] < t) & (t <= dfp['end']) ]
     if 'id' in props.columns:
         return props['id']
@@ -47,8 +50,11 @@ def timeIntervalSplitCurrent(dfv: pd.DataFrame, splits: int, dfp: pd.DataFrame, 
         else:
             yield train, test_filtered
 
-def timeFreqSplitCurrent(dfv: pd.DataFrame, freq: str, dfp: pd.DataFrame, return_open: bool = False, remove_not_in_train_col = None, normalize = True):
-    times = pd.date_range(dfv['timestamp'].min(), dfv['timestamp'].max(), freq=freq, normalize=normalize)
+def timeFreqSplitCurrent(
+    dfv: pd.DataFrame, freq: str, dfp: pd.DataFrame, return_open: bool = False, 
+    remove_not_in_train_col = None, normalize = True, inclusive: str = "right",
+    ):
+    times = pd.date_range(dfv['timestamp'].min(), dfv['timestamp'].max(), freq=freq, normalize=normalize, inclusive=inclusive)
     for train_end, test_end in zip(times, times[1:]):
         train, test = _getTrainTestFromTime(train_end, test_end, dfv, 'timestamp', remove_not_in_train_col=remove_not_in_train_col)
         

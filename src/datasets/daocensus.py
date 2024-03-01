@@ -1,45 +1,82 @@
+from typing import Dict, List, Union
+
 from pathlib import Path
 
 import torch
 import torch_geometric as PyG
 from torch_geometric.data import InMemoryDataset, HeteroData
 
+ORGS_DICT: Dict[str, List[str]] = {
+    'dxDAO - xDXdao': ['dxDAO', 'xDXdao'],
+    'Aave - Aavegotchi': ['Aave', 'Aavegotchi', 'AAVE'],
+    'MetaCartel - MetaCartel Ventures': ['MetaCartel Ventures', 'MetaCartel xDai', 'MetaCartel DAO'],
+}
+
 def download(path):
     import kaggle
     kaggle.api.dataset_download_cli('oiudoiajd/daos-census', path=path, unzip=True)
+    
+def _list2sql(list):
+    return "".join(["(", ", ".join(map("'{}'".format, list)), ")"])
+
+def _gen_orgs_query(parquet):
+    _casestr = "    WHEN name IN {caselst} THEN '{orgname}'"
+
+    _cases = "\n".join(_casestr.format(
+        orgname=orgname,
+        caselst=_list2sql(caselst),
+    ) for orgname, caselst in ORGS_DICT.items())
+    
+    return f"""
+CREATE VIEW deployments AS
+SELECT * EXCLUDE (name),
+    name AS deployment_name,
+    CASE 
+{_cases}
+    ELSE name
+    END AS name
+FROM parquet_scan('{parquet}')
+    """
 
 def load_pandas_df(
     raw_path: str,
     filter_name: str = None, 
-    filter_platform: str = None, 
+    filter_platforms: Union[str, List[str]] = None, 
     min_vpu: int = 0,
     min_vpp: int = 1,
+    use_org_names: bool = False,
 ):
     import pandas as pd
     import duckdb
 
     raw_path = Path(raw_path)
     db = duckdb.connect(database=':memory:', read_only=False)
-    db.execute("CREATE VIEW deployments AS SELECT * FROM parquet_scan('{}')".format(raw_path / "deployments.parquet"))
+    if use_org_names:
+        db.execute(_gen_orgs_query(raw_path / "deployments.parquet"))
+    else:
+        db.execute("CREATE VIEW deployments AS SELECT * FROM parquet_scan('{}')".format(raw_path / "deployments.parquet"))
     db.execute("CREATE VIEW votes AS SELECT * FROM parquet_scan('{}')".format(raw_path / "votes.parquet"))
     db.execute("CREATE VIEW proposals AS SELECT * FROM parquet_scan('{}')".format(raw_path / "proposals.parquet"))
 
     cond_dfv = f"name='{filter_name}'"
-    if filter_platform:
-        cond_dfv += f" AND platform='{filter_platform}'"
+    if filter_platforms:
+        if isinstance(filter_platforms, str):
+            filter_platforms = [filter_platforms]
+
+        cond_dfv += f" AND platform IN {_list2sql(filter_platforms)}"
 
     cond_dfp = cond_dfv
     if min_vpp:
         cond_dfp += f" AND proposals.votes_count >= {min_vpp}"
 
-    dfv = db.execute(f"""
+    dfv = db.execute(q := f"""
     SELECT platform, name, votes.*
     FROM deployments
     LEFT JOIN votes ON (deployments.id = votes.deployment_id)
     WHERE {cond_dfv}
     """).fetchdf().rename(columns=lambda x: x.replace('_id', ''))
 
-    dfp = db.execute(f"""
+    dfp = db.execute(q := f"""
     SELECT platform, name, platform_deployment_id, proposals.*
     FROM deployments
     LEFT JOIN proposals ON (deployments.id = proposals.deployment_id)
@@ -49,10 +86,15 @@ def load_pandas_df(
     dfv['voter'] = dfv['voter'].str.lower()
     dfp['author'] = dfp['author'].str.lower()
 
+    assert not any(pd.isna(dfv['voter'])), "There are NA voters"
+    assert not any(pd.isna(dfp['author'])), "There are NA authors"
+
     if min_vpu:
         vpu = dfv.groupby('voter').size()
         allowed_voters = vpu[vpu >= min_vpu].index
-        dfv = dfv[dfv['voter'].isin(allowed_voters)].reset_index(drop=True)
+        msk = dfv['voter'].isin(allowed_voters)
+        dfv = dfv[msk].reset_index(drop=True)
+        print(f"Removing {(~nvoters_removed).sum()} voters with less than {min_vpu} votes")
 
     prop_dtype = pd.api.types.CategoricalDtype(categories=dfp['id'])
     user_dtype = pd.api.types.CategoricalDtype(categories=set(dfv['voter']).union(dfp['author']))

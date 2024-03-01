@@ -12,7 +12,10 @@ def download(path):
     (path / 'proposals.parquet').rename(path / 'proposals-original.parquet')
     (path / 'proposals-text.parquet').rename(path / 'proposals.parquet')
 
-def load_pandas_df(raw_path: str, *args, remove_new_proposals=True, remove_ghost_votes=True, remove_unused_categories=True, **kwargs):
+def load_pandas_df(
+    raw_path: str, *args, remove_new_proposals=True, remove_ghost_votes=True, 
+    remove_unused_categories=True, empty_ok=False, **kwargs
+    ):
     dfv, dfp = daocensus.load_pandas_df(raw_path, *args, **kwargs)
     
     if remove_new_proposals:
@@ -32,6 +35,10 @@ def load_pandas_df(raw_path: str, *args, remove_new_proposals=True, remove_ghost
         dfv = utils.remove_unused_categories(dfv)
         dfp = utils.remove_unused_categories(dfp)
 
+    if not empty_ok:
+        assert not dfp.empty, "dfp can't be empty, change the filters"
+        assert not dfv.empty, "dfv can't be empty, change the filters"
+
     return dfv, dfp
 
 def get(
@@ -39,6 +46,7 @@ def get(
     filter_name: str = None, 
     filter_platform: str = None, 
     min_vpu: int = 0,
+    **kwargs,
 ):
     root = Path(root)
     raw_dir = root/'raw'
@@ -46,4 +54,4 @@ def get(
         print(f"Folder {raw_dir} not found, downloading")
         download(raw_dir)
 
-    return load_pandas_df(raw_dir, filter_name, filter_platform, min_vpu)
+    return load_pandas_df(raw_dir, filter_name, filter_platform, min_vpu, **kwargs)
