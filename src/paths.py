@@ -1,23 +1,11 @@
 from pathlib import Path
+from warnings import warn
 
-BASELINE_BASE_PATH = Path('./data/baseline')
 HYBRID_BASE_PATH = Path('./data/hybrid')
 PLN_BASE_PATH = Path('./data/pln')
 
-def baseline_mp(org_name: str, n_splits: int, base: Path=BASELINE_BASE_PATH) -> Path:
-    base.mkdir(exist_ok=True)
-    return base / f'mp-{org_name}-{n_splits}.csv'
-
 def _gen_fname(prefix, org_name, splits_freq, normalize, ext='csv') -> str:
     return f'{prefix}-{org_name}-{splits_freq}{"-normalize" if normalize else ""}.{ext}'
-
-def perfect_mp_freq(org_name: str, splits_freq: str, normalize: bool, base: Path = BASELINE_BASE_PATH) -> Path:
-    base.mkdir(exist_ok=True)
-    return base / _gen_fname('perfect-freq', org_name, splits_freq, normalize)
-
-def baseline_mp_freq(org_name: str, splits_freq: str, normalize: bool, base: Path = BASELINE_BASE_PATH) -> Path:
-    base.mkdir(exist_ok=True)
-    return base / _gen_fname('mp-freq', org_name, splits_freq, normalize)
 
 def hybrid_best_hparams(org_name: str, splits_freq: str, normalize: bool, base: Path=HYBRID_BASE_PATH) -> Path:
     base.mkdir(exist_ok=True)

@@ -1,6 +1,7 @@
-from typing import Dict, List, Union
+from typing import Dict, List, Union, Optional
 
 from pathlib import Path
+import datetime as dt
 
 import torch
 import torch_geometric as PyG
@@ -45,6 +46,7 @@ def load_pandas_df(
     min_vpu: int = 0,
     min_vpp: int = 1,
     use_org_names: bool = False,
+    cutoff_date: Optional[dt.datetime] = False,
 ):
     import pandas as pd
     import duckdb
@@ -64,6 +66,9 @@ def load_pandas_df(
             filter_platforms = [filter_platforms]
 
         cond_dfv += f" AND platform IN {_list2sql(filter_platforms)}"
+
+    if cutoff_date:
+        cond_dfv += f" AND date <= '{cutoff_date.isoformat()}'"
 
     cond_dfp = cond_dfv
     if min_vpp:

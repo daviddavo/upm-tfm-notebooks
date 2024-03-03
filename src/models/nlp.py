@@ -24,6 +24,7 @@ def get_embeddings_from_cache(dfp, model, embeddings_cache=None):
         print("Some embeddings need to be calculated")
         remaining = dfp.loc[remaining_embeddings_idx]
         title_description = remaining['title'] + '\n' + remaining['description']
+        title_description = title_description.fillna("")
 
         new_embeddings = pd.Series(
             list(model.encode(title_description, show_progress_bar=True, normalize_embeddings=True)),
