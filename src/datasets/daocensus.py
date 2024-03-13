@@ -57,35 +57,39 @@ def load_pandas_df(
         db.execute(_gen_orgs_query(raw_path / "deployments.parquet"))
     else:
         db.execute("CREATE VIEW deployments AS SELECT * FROM parquet_scan('{}')".format(raw_path / "deployments.parquet"))
-    db.execute("CREATE VIEW votes AS SELECT * FROM parquet_scan('{}')".format(raw_path / "votes.parquet"))
-    db.execute("CREATE VIEW proposals AS SELECT * FROM parquet_scan('{}')".format(raw_path / "proposals.parquet"))
 
-    cond_dfv = f"name='{filter_name}'"
+    _cond_date = ""
+    if cutoff_date:
+        _cond_date = f"WHERE date <= '{cutoff_date.isoformat()}'"
+
+    db.execute("CREATE VIEW votes AS SELECT * FROM parquet_scan('{}') {}".format(raw_path / "votes.parquet", _cond_date))
+    db.execute("CREATE VIEW proposals AS SELECT * FROM parquet_scan('{}') {}".format(raw_path / "proposals.parquet", _cond_date))
+
+    cond_dfv = []
+
+    if filter_name:
+        cond_dfv.append(f"name='{filter_name}'")
     if filter_platforms:
         if isinstance(filter_platforms, str):
             filter_platforms = [filter_platforms]
 
-        cond_dfv += f" AND platform IN {_list2sql(filter_platforms)}"
-
-    if cutoff_date:
-        cond_dfv += f" AND date <= '{cutoff_date.isoformat()}'"
-
-    cond_dfp = cond_dfv
-    if min_vpp:
-        cond_dfp += f" AND proposals.votes_count >= {min_vpp}"
+        cond_dfv.append(f"platform IN {_list2sql(filter_platforms)}")
 
     dfv = db.execute(q := f"""
     SELECT platform, name, votes.*
     FROM deployments
-    LEFT JOIN votes ON (deployments.id = votes.deployment_id)
-    WHERE {cond_dfv}
+    RIGHT JOIN votes ON (deployments.id = votes.deployment_id)
+    WHERE {" AND ".join(cond_dfv)}
     """).fetchdf().rename(columns=lambda x: x.replace('_id', ''))
 
     dfp = db.execute(q := f"""
-    SELECT platform, name, platform_deployment_id, proposals.*
+    SELECT platform, name, platform_deployment_id, proposals.* EXCLUDE (votes_count), count(votes.id) AS votes_count
     FROM deployments
-    LEFT JOIN proposals ON (deployments.id = proposals.deployment_id)
-    WHERE {cond_dfp}
+    RIGHT JOIN proposals ON (deployments.id = proposals.deployment_id)
+    LEFT JOIN votes ON (proposals.id = votes.proposal_id)
+    WHERE {" AND ".join(cond_dfv)}
+    GROUP BY proposals.*
+    HAVING count(votes.id) >= {min_vpp}
     """).fetchdf().rename(columns=lambda x: x.replace('_id', ''))
 
     dfv['voter'] = dfv['voter'].str.lower()
@@ -113,6 +117,18 @@ def load_pandas_df(
     dfp['id'] = dfp['id'].astype(prop_dtype)
 
     return dfv, dfp
+
+def get_latest_date(root: str) -> dt.datetime:
+    import duckdb
+
+    root = Path(root)
+    raw_dir = root/'raw'
+    if not raw_dir.exists():
+        print(f"Folder {raw_dir} not found, downloading")
+        download(raw_dir)
+
+    db = duckdb.connect(database=':memory:', read_only=False)
+    return db.execute("SELECT MAX(date) FROM parquet_scan('{}')".format(raw_dir / "votes.parquet")).fetchone()[0]
 
 def get(
     root: str,

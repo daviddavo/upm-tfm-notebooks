@@ -30,8 +30,7 @@ class LightGCNCustom(LightGCN):
             emb_loss += batch_emb_loss / n_batch
 
         if np.isnan(loss):
-            print("ERROR: loss is nan.")
-            sys.exit()
+            raise ValueError("loss is nan.")
 
         self.epochs_done += 1
 
@@ -53,6 +52,7 @@ class LightGCNCustom(LightGCN):
 
         ### START NEW BEHAVIOUR
         if recommend_from is not None:
+            # from_idx = np.array([data.item2id[x] for x in set(recommend_from) if x in data.item2id])
             from_idx = np.array([data.item2id[x] for x in set(recommend_from)])
             msk = np.ones(test_scores.shape[1], bool)
             msk[from_idx] = False

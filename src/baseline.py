@@ -8,17 +8,17 @@ from src.paths import _gen_fname
 
 BASELINE_BASE_PATH = Path('./data/baseline')
 
-def baseline_mp(org_name: str, n_splits: int, base: Path=BASELINE_BASE_PATH) -> Path:
+def baseline_mp(org_name: str, n_splits: int, base: Path=BASELINE_BASE_PATH, ext='csv') -> Path:
     base.mkdir(exist_ok=True)
-    return base / f'mp-{org_name}-{n_splits}.csv'
+    return base / f'mp-{org_name}-{n_splits}.{ext}'
 
 def baseline_mp_freq(org_name: str, splits_freq: str, normalize: bool, base: Path = BASELINE_BASE_PATH) -> Path:
     base.mkdir(exist_ok=True)
-    return base / _gen_fname('mp-freq', org_name, splits_freq, normalize)
+    return base / _gen_fname('mp-freq', org_name, splits_freq, normalize, ext='parquet')
 
 def perfect_mp_freq(org_name: str, splits_freq: str, normalize: bool, base: Path = BASELINE_BASE_PATH) -> Path:
     base.mkdir(exist_ok=True)
-    return base / _gen_fname('perfect-freq', org_name, splits_freq, normalize)
+    return base / _gen_fname('perfect-freq', org_name, splits_freq, normalize, ext='parquet')
 
 
 def getBaselineRecommendations(train: pd.DataFrame, users, proposals, k: int = 5, remove_train=True):
@@ -51,7 +51,6 @@ def _read_metrics(path, cutoff_date = ...):
     
     df = pd.read_parquet(path)
     if cutoff_date:
-        print(df.index)
         df = df[df.index <= cutoff_date]
     
     return df

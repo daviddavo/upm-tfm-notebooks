@@ -1,6 +1,7 @@
 from typing import Optional
 
 import pandas as pd
+import numpy as np
 
 def _getTrainTestFromTime(train_end_t, test_end_t, df, timestamp_col, remove_not_in_train_col: Optional[str] = None):
     train = df[df[timestamp_col] <= train_end_t]
@@ -57,11 +58,12 @@ def timeFreqSplitCurrent(
     times = pd.date_range(dfv['timestamp'].min(), dfv['timestamp'].max(), freq=freq, normalize=normalize, inclusive=inclusive)
     for train_end, test_end in zip(times, times[1:]):
         train, test = _getTrainTestFromTime(train_end, test_end, dfv, 'timestamp', remove_not_in_train_col=remove_not_in_train_col)
+        all_props = np.union1d(train['itemID'], test['itemID'])
         
-        open_proposals = current_proposals(dfp, train_end)
+        open_proposals = np.intersect1d(all_props, current_proposals(dfp, train_end))
         test_filtered = test[test['itemID'].isin(open_proposals)]
 
         if return_open:
-            yield train, test_filtered, train_end, open_proposals 
+            yield train, test_filtered, train_end, np.array(open_proposals)
         else:
             yield train, test_filtered

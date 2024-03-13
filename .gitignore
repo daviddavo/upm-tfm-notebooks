@@ -1,5 +1,9 @@
+# Other files
+07_microsoft_tuning_old.ipynb
+
 # IDEs
 .vscode
+.jupyter_ystore.db
 
 # Local Environment files
 .env.local
