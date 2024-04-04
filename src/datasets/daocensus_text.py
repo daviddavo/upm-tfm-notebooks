@@ -58,4 +58,10 @@ def get(
     return load_pandas_df(raw_dir, filter_name, filter_platform, min_vpu, **kwargs)
 
 def get_latest_date(root: str) -> dt.datetime:
+    root = Path(root)
+    raw_dir = root/'raw'
+    if not raw_dir.exists():
+        print(f"Folder {raw_dir} not found, downloading")
+        download(raw_dir)
+
     return daocensus.get_latest_date(root)

@@ -1,5 +1,8 @@
 # Other files
 07_microsoft_tuning_old.ipynb
+*.zip
+*.tar
+*.tar.gz
 
 # IDEs
 .vscode

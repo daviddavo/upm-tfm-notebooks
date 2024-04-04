@@ -56,7 +56,10 @@ def timeFreqSplitCurrent(
     remove_not_in_train_col = None, normalize = True, inclusive: str = "right",
     ):
     times = pd.date_range(dfv['timestamp'].min(), dfv['timestamp'].max(), freq=freq, normalize=normalize, inclusive=inclusive)
-    for train_end, test_end in zip(times, times[1:]):
+    test_end = dfv['timestamp'].max()
+
+    # for train_end, test_end in zip(times, times[1:]):
+    for train_end in times[:-1]:
         train, test = _getTrainTestFromTime(train_end, test_end, dfv, 'timestamp', remove_not_in_train_col=remove_not_in_train_col)
         all_props = np.union1d(train['itemID'], test['itemID'])
         
