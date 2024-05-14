@@ -8,8 +8,7 @@ from .. import utils
 
 def download(path):
     import kaggle
-    daocensus.download(path)
-    kaggle.api.dataset_download_cli('daviddavo/daos-census-proposals-text', path=path, unzip=True)
+    kaggle.api.dataset_download_cli('daviddavo/daos-census-tfm', path=path, unzip=True)
     (path / 'proposals.parquet').rename(path / 'proposals-original.parquet')
     (path / 'proposals-text.parquet').rename(path / 'proposals.parquet')
 
