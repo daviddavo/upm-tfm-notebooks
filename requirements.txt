@@ -5,6 +5,7 @@ git+https://github.com/daviddavo/pytorch_geometric
 matplotlib
 plotly
 ray[tune]
+requests-toolbelt
 hyperopt
 ipywidgets
 duckdb
@@ -18,3 +19,4 @@ solara
 kaleido
 jupysql
 papermill
+zenodo_client

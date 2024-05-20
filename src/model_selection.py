@@ -53,13 +53,13 @@ def timeIntervalSplitCurrent(dfv: pd.DataFrame, splits: int, dfp: pd.DataFrame, 
 
 def timeFreqSplitCurrent(
     dfv: pd.DataFrame, freq: str, dfp: pd.DataFrame, return_open: bool = False, 
-    remove_not_in_train_col = None, normalize = True, inclusive: str = "right",
+    remove_not_in_train_col = None, normalize = True, inclusive: str = "left",
     ):
     times = pd.date_range(dfv['timestamp'].min(), dfv['timestamp'].max(), freq=freq, normalize=normalize, inclusive=inclusive)
     test_end = dfv['timestamp'].max()
 
     # for train_end, test_end in zip(times, times[1:]):
-    for train_end in times[:-1]:
+    for train_end in times:
         train, test = _getTrainTestFromTime(train_end, test_end, dfv, 'timestamp', remove_not_in_train_col=remove_not_in_train_col)
         all_props = np.union1d(train['itemID'], test['itemID'])
         

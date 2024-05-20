@@ -22,6 +22,7 @@ def perfect_mp_freq(org_name: str, splits_freq: str, normalize: bool, base: Path
 
 
 def getBaselineRecommendations(train: pd.DataFrame, users, proposals, k: int = 5, remove_train=True):
+    train = train.sort_values('timestamp', ascending=False) # To make it replicable
     bestVotes = train[train['itemID'].isin(proposals)]['itemID'].value_counts()
     # bestVotes = bestVotes[bestVotes.index.isin(proposals)]
 
