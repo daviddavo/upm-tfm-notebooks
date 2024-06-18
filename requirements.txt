@@ -12,7 +12,7 @@ duckdb
 duckdb-engine
 kaggle
 lenskit
-recommenders
+recommenders>=1.2.0
 tensorflow
 sentence-transformers
 joblib

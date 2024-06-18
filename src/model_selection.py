@@ -1,7 +1,10 @@
 from typing import Optional
+from collections import namedtuple
 
 import pandas as pd
 import numpy as np
+
+Fold = namedtuple('Fold', ['train', 'test', 'end', 'open_proposals'])
 
 def _getTrainTestFromTime(train_end_t, test_end_t, df, timestamp_col, remove_not_in_train_col: Optional[str] = None):
     train = df[df[timestamp_col] <= train_end_t]
@@ -54,19 +57,20 @@ def timeIntervalSplitCurrent(dfv: pd.DataFrame, splits: int, dfp: pd.DataFrame, 
 def timeFreqSplitCurrent(
     dfv: pd.DataFrame, freq: str, dfp: pd.DataFrame, return_open: bool = False, 
     remove_not_in_train_col = None, normalize = True, inclusive: str = "left",
-    ):
-    times = pd.date_range(dfv['timestamp'].min(), dfv['timestamp'].max(), freq=freq, normalize=normalize, inclusive=inclusive)
+    item_col='itemID', user_col='userID', timestamp_col='timestamp',
+    ) -> Fold:
+    times = pd.date_range(dfv[timestamp_col].min(), dfv[timestamp_col].max(), freq=freq, normalize=normalize, inclusive=inclusive)
     test_end = dfv['timestamp'].max()
+
+    assert return_open, "Return open is deprecated and default will be True in the future"
+        
 
     # for train_end, test_end in zip(times, times[1:]):
     for train_end in times:
-        train, test = _getTrainTestFromTime(train_end, test_end, dfv, 'timestamp', remove_not_in_train_col=remove_not_in_train_col)
-        all_props = np.union1d(train['itemID'], test['itemID'])
+        train, test = _getTrainTestFromTime(train_end, test_end, dfv, timestamp_col, remove_not_in_train_col=remove_not_in_train_col)
+        all_props = np.union1d(train[item_col], test[item_col])
         
         open_proposals = np.intersect1d(all_props, current_proposals(dfp, train_end))
-        test_filtered = test[test['itemID'].isin(open_proposals)]
+        test_filtered = test[test[item_col].isin(open_proposals)]
 
-        if return_open:
-            yield train, test_filtered, train_end, np.array(open_proposals)
-        else:
-            yield train, test_filtered
+        yield Fold(train, test_filtered, train_end, np.array(open_proposals))
