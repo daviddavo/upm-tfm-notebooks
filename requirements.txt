@@ -11,6 +11,7 @@ ipywidgets
 duckdb
 duckdb-engine
 kaggle
+lenskit
 recommenders
 tensorflow
 sentence-transformers
