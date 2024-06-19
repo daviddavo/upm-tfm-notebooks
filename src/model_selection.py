@@ -1,8 +1,16 @@
+import sys
+import pickle
+import datetime as dt
+
 from typing import Optional
 from collections import namedtuple
+from pathlib import Path
 
 import pandas as pd
 import numpy as np
+from tqdm.autonotebook import tqdm
+
+DEFAULT_CHECKPOINT_EVERY = dt.timedelta(seconds=30)
 
 Fold = namedtuple('Fold', ['train', 'test', 'end', 'open_proposals'])
 
@@ -74,3 +82,55 @@ def timeFreqSplitCurrent(
         test_filtered = test[test[item_col].isin(open_proposals)]
 
         yield Fold(train, test_filtered, train_end, np.array(open_proposals))
+
+def save_progress(data, fname, keys):
+    fname.parent.mkdir(parents=True, exist_ok=True)
+    
+    with open(fname, 'wb') as f:
+        pickle.dump({
+            'data': data,
+            'keys': keys,
+        }, f)
+
+
+def load_progress(fname: Path, keys):
+    if not fname.exists():
+        return {}
+        
+    with open(fname, 'rb') as f:
+        p = pickle.load(f)
+        assert list(p['keys']) == list(keys), f'Not the same keys! {p["keys"]} != {keys}'
+        return p['data']
+
+def explore_hparams(func, param_grid, fname, checkpoint_every=DEFAULT_CHECKPOINT_EVERY):
+    if not param_grid:
+        return {}
+
+    keys = list(sorted(param_grid[0].keys()))
+    results = load_progress(fname, keys)
+    if results:
+        print("Restored checkpoint from", fname, "with", len(results), "results")
+    
+    try:
+        next_checkpoint = dt.datetime.now() + checkpoint_every
+        for p in tqdm(param_grid):
+            p = dict(sorted(p.items()))
+            assert list(p.keys()) == keys, f'Changing keys in the hparams is not supported {p.keys()} != {keys}'
+            k = tuple(p.values())
+            if k in results:
+                continue
+            
+            results[k] = func(**p)
+
+            if dt.datetime.now() > next_checkpoint:
+                next_checkpoint = dt.datetime.now() + checkpoint_every
+                save_progress(results, fname, keys)
+                print(f"[{dt.datetime.now().isoformat()}] Saving checkpoint at {fname}")
+    except KeyboardInterrupt:
+        print("Interrupt received, returning", file=sys.stderr)
+
+    save_progress(results, fname, keys)
+
+    # Convert the results to records format
+    asked = { tuple(v for _,v in sorted(p.items())) for p in param_grid }
+    return [ dict(zip(keys,v)) | r for v,r in results.items() if v in asked ]

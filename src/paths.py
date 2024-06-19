@@ -3,6 +3,7 @@ from warnings import warn
 
 HYBRID_BASE_PATH = Path('./data/hybrid')
 PLN_BASE_PATH = Path('./data/pln')
+KNN_BASE_PATH = Path('./data/knn')
 
 def _gen_fname(prefix, org_name, splits_freq, normalize, ext='csv', **kwargs) -> str:
     other_args = "-".join([ f"{k}={v}" for k,v in kwargs.items() if v ])
@@ -41,3 +42,8 @@ def pln_mdf(org_name, splits_freq, normalize, cutoff_date, *args, base: Path=PLN
 
     base.mkdir(exist_ok=True)
     return base / _gen_fname('mdf', org_name, splits_freq, normalize, ext='pkl', cutoff_date=cutoff_date)
+
+def knn_progress(name, org_name, splits_freq, normalize, cutoff_date, *args, base: Path=KNN_BASE_PATH):
+    assert not args
+    base.mkdir(exist_ok=True)
+    return base / _gen_fname(f'{name}-progress', org_name, splits_freq, normalize, ext='pickle', cutoff_date=cutoff_date)
