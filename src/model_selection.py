@@ -47,8 +47,8 @@ def current_proposals(dfp, t):
     else:
         return props.index
 
-def filter_current(df, dfp, t):
-    return df[df['itemID'].isin(current_proposals(dfp, t))]
+def filter_current(df, dfp, t, item_col='itemID'):
+    return df[df[item_col].isin(current_proposals(dfp, t))]
 
 def timeIntervalSplitCurrent(dfv: pd.DataFrame, splits: int, dfp: pd.DataFrame, return_open: bool = False, **kwargs):
     for train, test in timeIntervalSplit(dfv, splits, **kwargs):
@@ -68,7 +68,7 @@ def timeFreqSplitCurrent(
     item_col='itemID', user_col='userID', timestamp_col='timestamp',
     ) -> Fold:
     times = pd.date_range(dfv[timestamp_col].min(), dfv[timestamp_col].max(), freq=freq, normalize=normalize, inclusive=inclusive)
-    test_end = dfv['timestamp'].max()
+    test_end = dfv[timestamp_col].max()
 
     assert return_open, "Return open is deprecated and default will be True in the future"
         

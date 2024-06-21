@@ -10,6 +10,18 @@ def to_microsoft(dfv):
     
     return df
 
+def to_lenskit(dfv):
+    df = dfv[['voter', 'proposal', 'date']].rename(columns={
+        'voter': 'user',
+        'proposal': 'item',
+        'date': 'timestamp',
+    })
+    df['user'] = df['user'].astype('str')
+    df['item'] = df['item'].astype('str')
+    df['rating'] = 1
+    
+    return df
+
 try:
     import torch
     import torch_geometric as PyG
